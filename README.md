@@ -65,7 +65,8 @@
 
 <img width="1749" height="405" alt="zlhsFdrvunVQCtx4nZIHANwhegMlqNYECYNsiF9GyXARQo8UFAllIIFq85elaLLaWNX6hmas9ZH6wKAxt2u-T5l9" src="https://github.com/user-attachments/assets/6bd37f43-bbd0-40d7-bd0b-48aaf6a6f43e" />
 
-<img width="1536" height="1024" alt="5ntyZnR0817xQS54gMIXnCQR3J3WaGIUUsFLDDTOA9b-1fqSvLDc5pB4ZalJbofG9CBI65iedTqW7Mwktf6YvJs7" src="https://github.com/user-attachments/assets/29cae47d-8eb0-4e26-bdb1-13766c35a8f9" />
+<img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/c27a9ed0-fff2-43ba-97a6-2cdd90dc0c55" />
+
 
 ## 3.2 Сценарии использования услуги
 
