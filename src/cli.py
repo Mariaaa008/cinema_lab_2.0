@@ -13,6 +13,7 @@ class CinemaCLI:
         self.catalog = CatalogService()
         self.schedule = ScheduleService(self.catalog)
         
+        # TODO: Ну так уж сильно могли бы и не палиться :(
         # Настройки SMTP (замените на свои для реальной отправки)
         self.notifier = NotificationService(
             smtp_host="smtp.gmail.com", smtp_port=587,
@@ -24,9 +25,14 @@ class CinemaCLI:
             notifier=self.notifier
         )
         self.auth = AuthService()
+        
+        # FIXME: Для Python 3.11 и Optional является устаревшей функцией
+        # тут подойдет такое описание: self.current_user: User | None = None
         self.current_user: Optional[User] = None
 
     def run(self) -> None:
+        # TODO: Комментарий к данной функции не нужен.
+        # TODO: Из названия класса и функции суть ясна
         """Запускает основной цикл программы."""
         print("=" * 40)
         print("  Cinema Booking System (Lab 3)")
@@ -40,8 +46,36 @@ class CinemaCLI:
             else:
                 self._client_menu()
 
+    # FIXME: Здесь и далее.
+    # Название функций - это глаголы, не существительные
     def _auth_menu(self) -> None:
         """Меню авторизации."""
+        
+        """
+        # TODO: 
+        # Здесь и далее числа 1, 2, 3 лучше вынести в IntEnum.
+        Например:
+        
+        ```python
+        from enum import IntEnum
+        
+        class CliClientCommands(IntEnum):
+            ShowMoviesAndBookCommand = 1 
+            ShowTicketsCommand = 2 
+            ExitCommand = 3 
+        
+        if choice not in CliClientCommands:
+            print("Неизвестная команда")
+            return
+
+        if choice == ShowMoviesAndBookCommand:
+            self._show_movies_and_book()
+        elif choice == ShowTicketsCommand:
+            self._show_my_tickets()
+            ... # И т.д.
+        ```
+        """
+        
         print("\n1. Войти | 2. Регистрация | 0. Выход")
         choice = input("Выбор: ").strip()
 
@@ -108,10 +142,19 @@ class CinemaCLI:
             print("Нет активных фильмов."); return
 
         print("\nАфиша:")
+        
+        """
+        # FIXME: Здесь и далее
+        # Это конструкция читается лучше
+        for movie in movies:
+            ...
+            
+        Не надо экономить буквы на название переменных
+        """
         for m in movies:
             print(f"[{m.id}] {m.title} ({m.duration_min} мин, {m.age_limit}+)")
 
-        mid = int(input("ID фильма: "))
+        mid = int(input("ID фильма: ")) # FIXME: mid -> move_id
         screenings = [s for s in self.schedule.get_screenings() if s.movie_id == mid]
         if not screenings:
             print("Нет сеансов."); return

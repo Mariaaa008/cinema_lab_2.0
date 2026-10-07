@@ -17,7 +17,9 @@ class AuthService:
         # Создаем администратора по умолчанию
         self.register("admin@cinema.ru", "admin", UserRole.ADMIN)
 
-    def register(self, email: str, password: str, role: UserRole = UserRole.CLIENT) -> User:
+    def register(
+        self, email: str, password: str, role: UserRole = UserRole.CLIENT
+    ) -> User:
         """Регистрирует нового пользователя."""
         user = User(id=self._next_id, email=email, password=password, role=role)
         self._users[self._next_id] = user
@@ -44,6 +46,35 @@ class CatalogService:
     """Сервис управления фильмами и залами."""
 
     def __init__(self) -> None:
+        
+        # TODO: Да, так тоже можно.
+        # Но вообще для работы с такими вот штуками используют классы-репозитории
+        # Это классы, которые, утрированно говоря, тоже хранят такие словари 
+        # и содержат функции для их управления.
+        
+        """
+        Например вместо:
+            CatalogService:
+                def __init__(self) -> None:
+                    self._movies: dict[int, Movie] = {}
+        
+        можно написать
+        class MoviesRepository:
+            def __init__(self) -> None:
+                self._movies: dict[int, Movie] = {}
+        
+            def add(self, movie: Movie): ...
+            def remove(self, movie_id: int): ...
+            def update(self, movie: UpdateMovieData): ...
+            
+        CatalogService:
+            def __init__(self) -> None:
+                self.movies_repo = MoviesRepository()
+            
+            def add_movie(self, movie: Movie):
+                self.movies_repo.add(movie)
+            
+        """
         self._movies: dict[int, Movie] = {}
         self._halls: dict[int, Hall] = {}
         self._movie_next_id: int = 1
@@ -52,8 +83,11 @@ class CatalogService:
     def add_movie(self, title: str, desc: str, duration: int, age: int) -> Movie:
         """Добавляет фильм в каталог."""
         movie = Movie(
-            id=self._movie_next_id, title=title, description=desc,
-            duration_min=duration, age_limit=age
+            id=self._movie_next_id,
+            title=title,
+            description=desc,
+            duration_min=duration,
+            age_limit=age,
         )
         self._movies[self._movie_next_id] = movie
         self._movie_next_id += 1
@@ -85,7 +119,9 @@ class ScheduleService:
         self._screenings: dict[int, Screening] = {}
         self._next_id: int = 1
 
-    def create_screening(self, movie_id: int, hall_id: int, time_str: str) -> Optional[Screening]:
+    def create_screening(
+        self, movie_id: int, hall_id: int, time_str: str
+    ) -> Optional[Screening]:
         """Создает новый сеанс."""
         try:
             start_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
@@ -98,10 +134,9 @@ class ScheduleService:
             return None
 
         screening = Screening(
-            id=self._next_id, movie_id=movie_id, 
-            hall_id=hall_id, start_time=start_time
+            id=self._next_id, movie_id=movie_id, hall_id=hall_id, start_time=start_time
         )
-        
+
         # Инициализация карты мест для этого конкретного сеанса
         hall = self._catalog._halls[hall_id]
         for r in range(1, hall.rows + 1):
@@ -125,8 +160,7 @@ class NotificationService:
     """Сервис отправки уведомлений (Email) через smtplib."""
 
     def __init__(
-        self, smtp_host: str, smtp_port: int, 
-        sender_email: str, sender_password: str
+        self, smtp_host: str, smtp_port: int, sender_email: str, sender_password: str
     ) -> None:
         self._smtp_host = smtp_host
         self._smtp_port = smtp_port
@@ -134,8 +168,13 @@ class NotificationService:
         self._sender_password = sender_password
 
     def send_ticket_email(
-        self, recipient_email: str, movie_title: str,
-        screening_time: str, hall_name: str, seats: list[str], qr_code: str
+        self,
+        recipient_email: str,
+        movie_title: str,
+        screening_time: str,
+        hall_name: str,
+        seats: list[str],
+        qr_code: str,
     ) -> bool:
         """Отправляет электронный билет на почту."""
         subject = f"Ваш билет на '{movie_title}'"
@@ -169,8 +208,10 @@ class BookingService:
     """Сервис бронирования билетов."""
 
     def __init__(
-        self, schedule: ScheduleService, catalog: CatalogService,
-        notifier: Optional[NotificationService] = None
+        self,
+        schedule: ScheduleService,
+        catalog: CatalogService,
+        notifier: Optional[NotificationService] = None,
     ) -> None:
         self._schedule = schedule
         self._catalog = catalog
@@ -179,8 +220,11 @@ class BookingService:
         self._next_id: int = 1
 
     def book_seats(
-        self, user_id: int, screening_id: int, 
-        seat_ids: list[str], auth_service: AuthService
+        self,
+        user_id: int,
+        screening_id: int,
+        seat_ids: list[str],
+        auth_service: AuthService,
     ) -> Optional[Booking]:
         """Бронирует места и отправляет уведомление."""
         screening = self._schedule.get_screening(screening_id)
@@ -202,14 +246,17 @@ class BookingService:
             screening.seat_map[seat_id] = SeatStatus.BOOKED
 
         qr = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
-        
+
         booking = Booking(
-            id=self._next_id, user_id=user_id,
-            screening_id=screening_id, seats=seat_ids, qr_code=qr
+            id=self._next_id,
+            user_id=user_id,
+            screening_id=screening_id,
+            seats=seat_ids,
+            qr_code=qr,
         )
         self._bookings[self._next_id] = booking
         self._next_id += 1
-        
+
         print(f"\n[Успех] Билет забронирован! QR-код: {qr}")
 
         # Отправка уведомления
@@ -218,7 +265,7 @@ class BookingService:
             if user:
                 movie = self._catalog._movies.get(screening.movie_id)
                 hall = self._catalog._halls.get(screening.hall_id)
-                
+
                 success = self._notifier.send_ticket_email(
                     recipient_email=user.email,
                     movie_title=movie.title if movie else "Unknown",
@@ -249,7 +296,7 @@ class BookingService:
         if screening:
             for seat_id in booking.seats:
                 screening.seat_map[seat_id] = SeatStatus.FREE
-        
+
         del self._bookings[booking_id]
         print("[Успех] Бронь отменена, места освобождены.")
         return True
