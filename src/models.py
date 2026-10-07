@@ -56,15 +56,81 @@ class Screening:
     movie_id: int
     hall_id: int
     start_time: datetime
+    
+    # FIXME: Вот эта переменная должна быть в другом месте
+    # Ее можно сделать отдельным классом, который бы ссылался на Hall и Screening
     seat_map: dict[str, SeatStatus] = field(default_factory=dict)
+    
+    """
+    Например:
+    from dataclasses import dataclass, field
+
+    @dataclass
+    class SeatsOfScreeningStatus:
+        id: int
+        screening: Screening
+        hall: Hall
+        
+        _seat_map: dict[str, SeatStatus] = field(init=False, repr=False)
+
+        def __post_init__(self) -> None:
+            # Инициализируем карту мест по умолчанию — все FREE
+            self._seat_map = {
+                self.hall.get_seat_id(r, s): SeatStatus.FREE
+                for r in range(1, self.hall.rows + 1)
+                for s in range(1, self.hall.seats_per_row + 1)
+            }
+
+        @property
+        def seat_map(self) -> dict[str, SeatStatus]:
+            return self._seat_map
+
+        @seat_map.setter
+        def seat_map(self, value: dict[str, SeatStatus]) -> None:
+            # Можно добавить валидацию, например: ключи должны совпадать с местами зала
+            expected_ids = {
+                self.hall.get_seat_id(r, s)
+                for r in range(1, self.hall.rows + 1)
+                for s in range(1, self.hall.seats_per_row + 1)
+            }
+            if set(value.keys()) != expected_ids:
+                raise ValueError("Ключи seat_map не соответствуют местам зала")
+            self._seat_map = value
+    """
+    
 
 
 @dataclass
 class Booking:
     """Модель бронирования (билета)."""
     id: int
-    user_id: int
+    user_id: int # FIXME: user_id -> created_by
     screening_id: int
-    seats: list[str]
+    
+    # FIXME: лучше не list[str], а set[int]. 
+    # Или лучше вообще создать класс Seat
+    seats: list[str] 
+    
+    """
+    Например:
+    
+    @dataclass
+    class Seat:
+        screening: SeatsOfScreeningStatus
+        
+        row: int
+        number: int
+        
+        status: SeatStatus = SeatStatus.FREE
+        
+        
+    @dataclass
+    class Booking:
+        id: int
+        created_by: int
+        screening_id: int
+        seats: list[Seat] 
+    """
+    
     qr_code: str
     created_at: datetime = field(default_factory=datetime.now)
