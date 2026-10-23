@@ -1,206 +1,197 @@
-import random
-import string
+import os
 import smtplib
 from email.mime.text import MIMEText
-from datetime import datetime
-from typing import Optional
+from email.mime.multipart import MIMEMultipart
+from typing import Optional, List
 
-from .models import User, Movie, Hall, Screening, Booking, UserRole, SeatStatus
+from src.models import User, Movie, Hall, Screening, Booking, UserRole, SeatStatus
+from src.repositories import (
+    MovieRepository, HallRepository, ScreeningRepository,
+    UserRepository, BookingRepository,
+    InMemoryMovieRepository, InMemoryHallRepository,
+    InMemoryScreeningRepository, InMemoryUserRepository,
+    InMemoryBookingRepository
+)
 
 
 class AuthService:
     """Сервис аутентификации и управления пользователями."""
 
-    def __init__(self) -> None:
-        self._users: dict[int, User] = {}
-        self._next_id: int = 1
+    def __init__(self, user_repository: Optional[UserRepository] = None) -> None:
+        self.user_repository = user_repository or InMemoryUserRepository()
         # Создаем администратора по умолчанию
-        self.register("admin@cinema.ru", "admin", UserRole.ADMIN)
+        try:
+            self.register("admin@cinema.ru", "admin", UserRole.ADMIN)
+        except ValueError:
+            pass  # Админ уже существует
 
-    def register(
-        self, email: str, password: str, role: UserRole = UserRole.CLIENT
-    ) -> User:
-        """Регистрирует нового пользователя."""
-        user = User(id=self._next_id, email=email, password=password, role=role)
-        self._users[self._next_id] = user
-        self._next_id += 1
-        return user
+    def register(self, email: str, password: str, role: UserRole = UserRole.CLIENT) -> User:
+        existing_user = self.user_repository.get_by_email(email)
+        if existing_user:
+            raise ValueError("Пользователь с таким email уже существует")
+        
+        user = User(
+            id=0,
+            email=email,
+            password=password,
+            role=role
+        )
+        return self.user_repository.add(user)
 
     def login(self, email: str, password: str) -> Optional[User]:
-        """Проверяет учетные данные. Возвращает User или None."""
-        for user in self._users.values():
-            if user.email == email and user.password == password:
-                return user
+        user = self.user_repository.get_by_email(email)
+        if user and user.password == password:
+            return user
         return None
-
+    
     def get_user(self, user_id: int) -> Optional[User]:
-        """Получает пользователя по ID."""
-        return self._users.get(user_id)
-
-    def check_admin(self, user: Optional[User]) -> bool:
-        """Проверяет права администратора."""
-        return user is not None and user.role == UserRole.ADMIN
+        return self.user_repository.get(user_id)
 
 
 class CatalogService:
     """Сервис управления фильмами и залами."""
 
-    def __init__(self) -> None:
-        
-        # TODO: Да, так тоже можно.
-        # Но вообще для работы с такими вот штуками используют классы-репозитории
-        # Это классы, которые, утрированно говоря, тоже хранят такие словари 
-        # и содержат функции для их управления.
-        
-        """
-        Например вместо:
-            CatalogService:
-                def __init__(self) -> None:
-                    self._movies: dict[int, Movie] = {}
-        
-        можно написать
-        class MoviesRepository:
-            def __init__(self) -> None:
-                self._movies: dict[int, Movie] = {}
-        
-            def add(self, movie: Movie): ...
-            def remove(self, movie_id: int): ...
-            def update(self, movie: UpdateMovieData): ...
-            
-        CatalogService:
-            def __init__(self) -> None:
-                self.movies_repo = MoviesRepository()
-            
-            def add_movie(self, movie: Movie):
-                self.movies_repo.add(movie)
-            
-        """
-        self._movies: dict[int, Movie] = {}
-        self._halls: dict[int, Hall] = {}
-        self._movie_next_id: int = 1
-        self._hall_next_id: int = 1
+    def __init__(
+        self,
+        movie_repository: Optional[MovieRepository] = None,
+        hall_repository: Optional[HallRepository] = None
+    ) -> None:
+        self.movie_repository = movie_repository or InMemoryMovieRepository()
+        self.hall_repository = hall_repository or InMemoryHallRepository()
 
-    def add_movie(self, title: str, desc: str, duration: int, age: int) -> Movie:
-        """Добавляет фильм в каталог."""
+    def add_movie(self, title: str, description: str, duration_min: int, age_limit: int) -> Movie:
         movie = Movie(
-            id=self._movie_next_id,
+            id=0,
             title=title,
-            description=desc,
-            duration_min=duration,
-            age_limit=age,
+            description=description,
+            duration_min=duration_min,
+            age_limit=age_limit
         )
-        self._movies[self._movie_next_id] = movie
-        self._movie_next_id += 1
-        return movie
+        return self.movie_repository.add(movie)
+    
+    def get_movies(self) -> List[Movie]:
+        return self.movie_repository.get_active_movies()
+    
+    def get_movie(self, movie_id: int) -> Optional[Movie]:
+        return self.movie_repository.get(movie_id)
 
-    def get_movies(self, active_only: bool = True) -> list[Movie]:
-        """Возвращает список фильмов."""
-        if active_only:
-            return [m for m in self._movies.values() if m.is_active]
-        return list(self._movies.values())
-
-    def add_hall(self, name: str, rows: int, seats: int) -> Hall:
-        """Добавляет зал."""
-        hall = Hall(id=self._hall_next_id, name=name, rows=rows, seats_per_row=seats)
-        self._halls[self._hall_next_id] = hall
-        self._hall_next_id += 1
-        return hall
-
-    def get_halls(self) -> list[Hall]:
-        """Возвращает список залов."""
-        return list(self._halls.values())
+    def add_hall(self, name: str, rows: int, seats_per_row: int) -> Hall:
+        hall = Hall(
+            id=0,
+            name=name,
+            rows=rows,
+            seats_per_row=seats_per_row
+        )
+        return self.hall_repository.add(hall)
+    
+    def get_halls(self) -> List[Hall]:
+        return self.hall_repository.get_all()
+    
+    def get_hall(self, hall_id: int) -> Optional[Hall]:
+        return self.hall_repository.get(hall_id)
 
 
 class ScheduleService:
     """Сервис управления расписанием сеансов."""
 
-    def __init__(self, catalog: CatalogService) -> None:
-        self._catalog = catalog
-        self._screenings: dict[int, Screening] = {}
-        self._next_id: int = 1
+    def __init__(
+        self,
+        catalog: CatalogService,
+        screening_repository: Optional[ScreeningRepository] = None
+    ) -> None:
+        self.catalog = catalog
+        self.screening_repository = screening_repository or InMemoryScreeningRepository()
 
-    def create_screening(
-        self, movie_id: int, hall_id: int, time_str: str
-    ) -> Optional[Screening]:
-        """Создает новый сеанс."""
-        try:
-            start_time = datetime.strptime(time_str, "%Y-%m-%d %H:%M")
-        except ValueError:
-            print("[Ошибка] Неверный формат времени. Используйте YYYY-MM-DD HH:MM")
+    def create_screening(self, movie_id: int, hall_id: int, start_time_str: str) -> Optional[Screening]:
+        from datetime import datetime
+        
+        movie = self.catalog.get_movie(movie_id)
+        hall = self.catalog.get_hall(hall_id)
+        
+        if not movie or not hall:
             return None
-
-        if movie_id not in self._catalog._movies or hall_id not in self._catalog._halls:
-            print("[Ошибка] Фильм или зал не найдены.")
-            return None
-
+        
+        start_time = datetime.strptime(start_time_str, "%Y-%m-%d %H:%M")
+        
         screening = Screening(
-            id=self._next_id, movie_id=movie_id, hall_id=hall_id, start_time=start_time
+            id=0,
+            movie_id=movie_id,
+            hall_id=hall_id,
+            start_time=start_time,
+            seat_map={}
         )
-
-        # Инициализация карты мест для этого конкретного сеанса
-        hall = self._catalog._halls[hall_id]
-        for r in range(1, hall.rows + 1):
-            for s in range(1, hall.seats_per_row + 1):
-                screening.seat_map[hall.get_seat_id(r, s)] = SeatStatus.FREE
-
-        self._screenings[self._next_id] = screening
-        self._next_id += 1
-        return screening
-
-    def get_screenings(self) -> list[Screening]:
-        """Возвращает все сеансы."""
-        return list(self._screenings.values())
-
+        
+        # Инициализируем карту мест
+        for row in range(1, hall.rows + 1):
+            for seat in range(1, hall.seats_per_row + 1):
+                seat_id = hall.get_seat_id(row, seat)
+                screening.seat_map[seat_id] = SeatStatus.FREE
+        
+        return self.screening_repository.add(screening)
+    
+    def get_screenings(self) -> List[Screening]:
+        return self.screening_repository.get_all()
+    
     def get_screening(self, screening_id: int) -> Optional[Screening]:
-        """Получает конкретный сеанс."""
-        return self._screenings.get(screening_id)
+        return self.screening_repository.get(screening_id)
+    
+    def get_screenings_by_movie(self, movie_id: int) -> List[Screening]:
+        return self.screening_repository.get_screenings_by_movie(movie_id)
 
 
 class NotificationService:
     """Сервис отправки уведомлений (Email) через smtplib."""
 
     def __init__(
-        self, smtp_host: str, smtp_port: int, sender_email: str, sender_password: str
+        self,
+        smtp_host: Optional[str] = None,
+        smtp_port: Optional[int] = None,
+        sender_email: Optional[str] = None,
+        sender_password: Optional[str] = None
     ) -> None:
-        self._smtp_host = smtp_host
-        self._smtp_port = smtp_port
-        self._sender_email = sender_email
-        self._sender_password = sender_password
+        # Исправление: Используем переменные окружения вместо хардкода
+        self._smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.gmail.com")
+        self._smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
+        self._sender_email = sender_email or os.getenv("SENDER_EMAIL", "your_app@gmail.com")
+        self._sender_password = sender_password or os.getenv("SENDER_PASSWORD", "app_password")
 
-    def send_ticket_email(
+    def send_booking_confirmation(
         self,
         recipient_email: str,
-        movie_title: str,
-        screening_time: str,
-        hall_name: str,
-        seats: list[str],
-        qr_code: str,
+        screening_info: str,
+        seats: List[str],
+        qr_code: str
     ) -> bool:
-        """Отправляет электронный билет на почту."""
-        subject = f"Ваш билет на '{movie_title}'"
-        body = (
-            f"Здравствуйте!\n\n"
-            f"Фильм: {movie_title}\n"
-            f"Сеанс: {screening_time}\n"
-            f"Зал: {hall_name}\n"
-            f"Места: {', '.join(seats)}\n\n"
-            f"QR-код: {qr_code}\n"
-            f"Покажите этот код на входе."
-        )
-
-        msg = MIMEText(body)
-        msg["Subject"] = subject
-        msg["From"] = self._sender_email
-        msg["To"] = recipient_email
-
+        subject = "Подтверждение бронирования"
+        body = f"""
+        Ваше бронирование подтверждено!
+        
+        Сеанс: {screening_info}
+        Места: {', '.join(seats)}
+        
+        QR-код: {qr_code[:50]}...
+        
+        Спасибо за бронирование!
+        """
+        
+        return self._send_email(recipient_email, subject, body)
+    
+    def _send_email(self, to_email: str, subject: str, body: str) -> bool:
         try:
+            msg = MIMEMultipart()
+            msg['From'] = self._sender_email
+            msg['To'] = to_email
+            msg['Subject'] = subject
+            msg.attach(MIMEText(body, 'plain'))
+            
             with smtplib.SMTP(self._smtp_host, self._smtp_port) as server:
                 server.starttls()
                 server.login(self._sender_email, self._sender_password)
                 server.send_message(msg)
+            
             return True
         except Exception as e:
-            print(f"[Ошибка Email] {e}")
+            print(f"Ошибка при отправке email: {e}")
             return False
 
 
@@ -211,92 +202,89 @@ class BookingService:
         self,
         schedule: ScheduleService,
         catalog: CatalogService,
-        notifier: Optional[NotificationService] = None,
+        auth: 'AuthService',
+        booking_repository: Optional[BookingRepository] = None
     ) -> None:
-        self._schedule = schedule
-        self._catalog = catalog
-        self._notifier = notifier
-        self._bookings: dict[int, Booking] = {}
-        self._next_id: int = 1
+        self.schedule = schedule
+        self.catalog = catalog
+        self.auth = auth
+        self.booking_repository = booking_repository or InMemoryBookingRepository()
 
     def book_seats(
         self,
         user_id: int,
         screening_id: int,
-        seat_ids: list[str],
-        auth_service: AuthService,
-    ) -> Optional[Booking]:
-        """Бронирует места и отправляет уведомление."""
-        screening = self._schedule.get_screening(screening_id)
+        seat_ids: List[str],
+        auth_service: 'AuthService'
+    ) -> Booking:
+        screening = self.schedule.get_screening(screening_id)
         if not screening:
-            print("[Ошибка] Сеанс не найден.")
-            return None
-
-        # Проверка доступности мест
+            raise ValueError("Сеанс не найден")
+        
+        user = auth_service.get_user(user_id)
+        if not user:
+            raise ValueError("Пользователь не найден")
+        
+        # Проверяем доступность мест
         for seat_id in seat_ids:
             if seat_id not in screening.seat_map:
-                print(f"[Ошибка] Место {seat_id} не существует.")
-                return None
+                raise ValueError(f"Место {seat_id} не существует")
+            
             if screening.seat_map[seat_id] != SeatStatus.FREE:
-                print(f"[Ошибка] Место {seat_id} уже занято.")
-                return None
-
-        # Фиксация брони
+                raise ValueError(f"Место {seat_id} уже забронировано")
+        
+        # Бронируем места
         for seat_id in seat_ids:
             screening.seat_map[seat_id] = SeatStatus.BOOKED
-
-        qr = "".join(random.choices(string.ascii_uppercase + string.digits, k=8))
-
+        
+        # Генерируем QR-код
+        qr_code = self._generate_qr_code(user_id, screening_id, seat_ids)
+        
+        # Создаем бронирование
         booking = Booking(
-            id=self._next_id,
+            id=0,
             user_id=user_id,
             screening_id=screening_id,
             seats=seat_ids,
-            qr_code=qr,
+            qr_code=qr_code
         )
-        self._bookings[self._next_id] = booking
-        self._next_id += 1
-
-        print(f"\n[Успех] Билет забронирован! QR-код: {qr}")
-
-        # Отправка уведомления
-        if self._notifier:
-            user = auth_service.get_user(user_id)
-            if user:
-                movie = self._catalog._movies.get(screening.movie_id)
-                hall = self._catalog._halls.get(screening.hall_id)
-
-                success = self._notifier.send_ticket_email(
-                    recipient_email=user.email,
-                    movie_title=movie.title if movie else "Unknown",
-                    screening_time=screening.start_time.strftime("%Y-%m-%d %H:%M"),
-                    hall_name=hall.name if hall else "Unknown",
-                    seats=seat_ids,
-                    qr_code=qr,
-                )
-                if success:
-                    print(f"[Email] Билет отправлен на {user.email}")
-                else:
-                    print("[Email] Ошибка отправки, но бронь сохранена.")
-
-        return booking
-
-    def get_user_bookings(self, user_id: int) -> list[Booking]:
-        """Возвращает историю бронирований пользователя."""
-        return [b for b in self._bookings.values() if b.user_id == user_id]
-
+        
+        return self.booking_repository.add(booking)
+    
+    def get_user_bookings(self, user_id: int) -> List[Booking]:
+        return self.booking_repository.get_by_user(user_id)
+    
     def cancel_booking(self, booking_id: int, user_id: int) -> bool:
-        """Отменяет бронь и освобождает места."""
-        booking = self._bookings.get(booking_id)
-        if not booking or booking.user_id != user_id:
-            print("[Ошибка] Бронь не найдена или нет прав.")
-            return False
-
-        screening = self._schedule.get_screening(booking.screening_id)
+        booking = self.booking_repository.get(booking_id)
+        
+        if not booking:
+            raise ValueError("Бронирование не найдено")
+        
+        if booking.user_id != user_id:
+            raise ValueError("Только владелец может отменить бронирование")
+        
+        # Освобождаем места
+        screening = self.schedule.get_screening(booking.screening_id)
         if screening:
             for seat_id in booking.seats:
                 screening.seat_map[seat_id] = SeatStatus.FREE
-
-        del self._bookings[booking_id]
-        print("[Успех] Бронь отменена, места освобождены.")
-        return True
+        
+        return self.booking_repository.delete(booking_id)
+    
+    def _generate_qr_code(self, user_id: int, screening_id: int, seats: List[str]) -> str:
+        import qrcode
+        import io
+        import base64
+        
+        data = f"USER:{user_id}|SCREENING:{screening_id}|SEATS:{','.join(seats)}"
+        
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(data)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        
+        return base64.b64encode(buffered.getvalue()).decode()[:50]
