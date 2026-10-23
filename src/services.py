@@ -21,7 +21,7 @@ class AuthService:
         self.user_repository = user_repository or InMemoryUserRepository()
         # Создаем администратора по умолчанию
         try:
-            self.register("admin@cinema.ru", "admin", UserRole.ADMIN)
+            self.register("liv4enkomarusia@mail.ru", "admin", UserRole.ADMIN)
         except ValueError:
             pass  # Админ уже существует
 
@@ -149,7 +149,6 @@ class NotificationService:
         sender_email: Optional[str] = None,
         sender_password: Optional[str] = None
     ) -> None:
-        # Исправление: Используем переменные окружения вместо хардкода
         self._smtp_host = smtp_host or os.getenv("SMTP_HOST", "smtp.gmail.com")
         self._smtp_port = smtp_port or int(os.getenv("SMTP_PORT", "587"))
         self._sender_email = sender_email or os.getenv("SENDER_EMAIL", "your_app@gmail.com")
