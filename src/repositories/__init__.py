@@ -6,14 +6,14 @@ from src.repositories.base import (
     ScreeningRepository, BookingRepository
 )
 
-# InMemory реализации (теперь из папки in_memory/)
+# InMemory реализации 
 from src.repositories.in_memory import (
     InMemoryUserRepository, InMemoryMovieRepository,
     InMemoryHallRepository, InMemoryScreeningRepository,
     InMemoryBookingRepository
 )
 
-# SQLAlchemy реализации (пока в одном файле)
+# SQLAlchemy реализации
 from src.repositories.sqlalchemy_repo import (
     SQLAlchemyUserRepository, SQLAlchemyMovieRepository,
     SQLAlchemyHallRepository, SQLAlchemyScreeningRepository,
