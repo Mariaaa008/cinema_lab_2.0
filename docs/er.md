@@ -46,7 +46,7 @@ erDiagram
         string qr_code
         datetime created_at
     }
-
+```
 ### Как читать связи:
 
 | Запись | Смысл |
